@@ -20,7 +20,7 @@ public class MessageClientService {
     @Cacheable("mensagens")
     public String buscarMensagens() {
 
-        System.out.println("Chamando API de mensagens...");
+        System.out.println("Chamando API de mensagens");
 
         String url = baseUrl + "/messages";
         return restTemplate.getForObject(url, String.class);
