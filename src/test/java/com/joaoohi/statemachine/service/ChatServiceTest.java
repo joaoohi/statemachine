@@ -1,13 +1,13 @@
 package com.joaoohi.statemachine.service;
 
-import com.joaoohi.statemachine.enums.Events;
 import com.joaoohi.statemachine.enums.States;
+import com.joaoohi.statemachine.model.ConversationState;
+import com.joaoohi.statemachine.repository.ConversationStateRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.statemachine.StateMachine;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.mockito.ArgumentCaptor;
 
-import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -15,55 +15,70 @@ import static org.mockito.Mockito.*;
 class ChatServiceTest {
 
     private ChatService chatService;
-    private StateMachine<States, Events> stateMachine;
+    private ConversationStateRepository repository;
 
     @BeforeEach
     void setup() {
-
-        stateMachine = mock(StateMachine.class);
-        chatService = new ChatService();
-
-        ReflectionTestUtils.setField(chatService, "stateMachine", stateMachine);
+        repository = mock(ConversationStateRepository.class);
+        chatService = new ChatService(repository);
     }
 
     @Test
     void deveRetornarMenuQuandoEstadoInicial() {
+        String clientId = "client123";
+        String mensagem = "oi";
 
-        var state = mock(org.springframework.statemachine.state.State.class);
+        when(repository.findById(clientId)).thenReturn(Optional.empty());
 
-        when(stateMachine.getState()).thenReturn(state);
-        when(state.getId()).thenReturn(States.INICIAL);
+        String resposta = chatService.receberMensagem(clientId, mensagem);
 
-        List<String> resposta = chatService.receberMensagem("oi");
+        assertTrue(resposta.contains("1 - Que dia é hoje?"));
 
-        assertEquals(4, resposta.size());
+        ArgumentCaptor<ConversationState> captor = ArgumentCaptor.forClass(ConversationState.class);
+        verify(repository).save(captor.capture());
 
-        verify(stateMachine).start();
-        verify(stateMachine).sendEvent(Events.RECEBER_MENSAGEM);
+        ConversationState saved = captor.getValue();
+        assertEquals(clientId, saved.getClientId());
+        assertEquals(States.AGUARDANDO_RESPOSTA, saved.getState());
+        assertEquals(mensagem, saved.getMessage());
     }
 
     @Test
-    void deveRetornarEstadoAtualQuandoNaoForInicial() {
+    void deveProcessarOpcaoQuandoEstadoAguardandoResposta() {
+        String clientId = "client123";
+        String mensagem = "1";
+        ConversationState existingConv = new ConversationState(clientId, "oi", States.AGUARDANDO_RESPOSTA);
 
-        var state = mock(org.springframework.statemachine.state.State.class);
+        when(repository.findById(clientId)).thenReturn(Optional.of(existingConv));
 
-        when(stateMachine.getState()).thenReturn(state);
-        when(state.getId()).thenReturn(States.FINAL);
+        String resposta = chatService.receberMensagem(clientId, mensagem);
 
-        List<String> resposta = chatService.receberMensagem("oi");
+        assertTrue(resposta.contains("Hoje é:"));
 
-        assertTrue(resposta.get(0).contains("Estado atual"));
+        ArgumentCaptor<ConversationState> captor = ArgumentCaptor.forClass(ConversationState.class);
+        verify(repository).save(captor.capture());
 
-        verify(stateMachine).start();
+        ConversationState saved = captor.getValue();
+        assertEquals(States.FINAL, saved.getState());
+        assertEquals(mensagem, saved.getMessage());
     }
 
     @Test
-    void deveGerarIdsIncrementais() {
+    void deveReiniciarConversaQuandoEstadoFinal() {
+        String clientId = "client123";
+        String mensagem = "oi";
+        ConversationState existingConv = new ConversationState(clientId, "4", States.FINAL);
 
-        Long id1 = chatService.gerarId();
-        Long id2 = chatService.gerarId();
+        when(repository.findById(clientId)).thenReturn(Optional.of(existingConv));
 
-        assertEquals(1, id1);
-        assertEquals(2, id2);
+        String resposta = chatService.receberMensagem(clientId, mensagem);
+
+        assertTrue(resposta.contains("1 - Que dia é hoje?"));
+
+        ArgumentCaptor<ConversationState> captor = ArgumentCaptor.forClass(ConversationState.class);
+        verify(repository).save(captor.capture());
+
+        ConversationState saved = captor.getValue();
+        assertEquals(States.AGUARDANDO_RESPOSTA, saved.getState());
     }
 }

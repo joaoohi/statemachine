@@ -9,8 +9,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.List;
-
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -29,19 +27,16 @@ class ChatControllerTest {
 
     @Test
     void deveReceberMensagem() throws Exception {
-
         ChatRequest request = new ChatRequest();
+        request.clientId = "client123";
         request.mensagem = "oi";
 
-        when(chatService.gerarId()).thenReturn(1L);
-        when(chatService.receberMensagem("oi"))
-                .thenReturn(List.of("menu1", "menu2"));
+        when(chatService.receberMensagem("client123", "oi")).thenReturn("Menu de opções...");
 
         mockMvc.perform(post("/chat")
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.menu[0]").value("menu1"));
+                .andExpect(jsonPath("$.resposta").value("Menu de opções..."));
     }
 }
